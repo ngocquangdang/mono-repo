@@ -85,22 +85,32 @@ export async function POST(request: NextRequest) {
 
     // Parse HTML response to extract the message
     const divMatch = htmlResponse.match(/<div[^>]*>(.*?)<\/div>/i);
+    let maThamDu = '';
+
     if (divMatch && divMatch[1]) {
       message = divMatch[1].trim();
-      
+      const result = htmlResponse.trim();
+      if (result.includes("!!!True|~~|")) {
+          //alert("Đăng ký tham dự thành công!");
+            const arrResult = result.split("|~~|");
+            maThamDu = arrResult[3]?.trim() || '';
+          console.log('MaThamDu:', maThamDu);
+      } 
       // Determine success based on message content
-      if (message.includes('thành công') || 
-          message.includes('successful') || 
-          message.includes('success') ||
-          message.includes('đăng ký thành công') ||
-          message.includes('registration successful')) {
+      if (maThamDu) {
+        
         success = true;
       } else if (message.includes('không hợp lệ') || 
                  message.includes('invalid') ||
                  message.includes('thất bại') ||
                  message.includes('failed') ||
                  message.includes('lỗi') ||
-                 message.includes('error')) {
+                 message.includes('error') || 
+                 message.includes('hết số lượng') ||
+                 message.includes('đầy chỗ') ||
+                 message.includes('full') ||
+                 message.includes('đăng ký đang tạm đóng') ||
+                 message.includes('link đăng ký đang tạm đóng')) {
         success = false;
       } else {
         success = responseStatus === 200;
@@ -123,7 +133,8 @@ export async function POST(request: NextRequest) {
       data: {
         rawHtml: htmlResponse,
         httpStatus: responseStatus,
-        method: htmlResponse.length > 0 ? 'fetch' : 'curl'
+        method: htmlResponse.length > 0 ? 'fetch' : 'curl',
+        maThamDu: maThamDu || ''
       }
     });
 

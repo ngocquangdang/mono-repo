@@ -4,6 +4,8 @@ export const API_CONFIG = {
   REGISTER_ENDPOINT: '/api/register',
   SALES_DATES_ENDPOINT: '/api/sales-dates',
   SESSIONS_ENDPOINT: '/api/sessions', // NEW
+  QR_GENERATION_ENDPOINT: '/api/qr-generation', // NEW
+  EMAIL_ENDPOINT: '/api/send-email', // NEW
   
   // POP MART API Configuration
   POP_MART: {
@@ -12,6 +14,8 @@ export const API_CONFIG = {
     REGISTER_URL: 'https://popmartstt.com/Ajax.aspx?Action=DangKyThamDu',
     REGISTRATION_PAGE_URL: 'https://popmartstt.com/popmart',
     SESSIONS_URL: 'https://popmartstt.com/Ajax.aspx?Action=LoadPhien', // NEW
+    QR_GENERATION_URL: 'https://popmartstt.com/DangKy.aspx/GenQRImage', // NEW
+    EMAIL_URL: 'https://popmartstt.com/Ajax.aspx?Action=SendEmail', // NEW
     
     // Session cookie - use the first session ID from the cookie string
     SESSION_COOKIE: 'ASP.NET_SessionId=mnjj0tg2hw4ziwvrasnfeguf',

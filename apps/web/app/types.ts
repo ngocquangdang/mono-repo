@@ -20,6 +20,11 @@ export interface UserRegistration {
   registrationDate?: string;
   registrationStatus?: 'pending' | 'success' | 'failed';
   errorMessage?: string;
+  maThamDu?: string; // QR code value
+  qrImageUrl?: string; // QR image URL
+  idPhien?: string; // Session ID for QR generation
+  emailSent?: boolean; // Email sending status
+  emailSentDate?: string; // Email sent timestamp
 }
 
 export interface CaptchaResponse {
@@ -36,6 +41,7 @@ export interface RegistrationResponse {
     rawHtml: string;
     httpStatus: number;
     method: string;
+    maThamDu?: string; // QR code value from successful registration
   };
 }
 

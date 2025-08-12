@@ -151,6 +151,51 @@ export const apiUtils = {
       console.error('Error fetching sessions:', error);
       return { success: false, sessions: [], error: (error as Error).message };
     }
+  },
+
+  // New function to generate QR code
+  generateQR: async (idPhien: string, maThamDu: string): Promise<{ success: boolean; qrImageUrl?: string; error?: string }> => {
+    try {
+      const config = getApiConfig();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), config.TIMEOUT);
+
+      const response = await fetch(config.QR_GENERATION_ENDPOINT, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idPhien, maThamDu })
+      });
+      clearTimeout(timeoutId);
+      if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
+      const data = await response.json();
+      return { success: data.success, qrImageUrl: `${config.POP_MART.BASE_URL}/${data.qrImageUrl}`, error: data.error };
+    } catch (error) {
+      console.error('Error generating QR:', error);
+      return { success: false, error: (error as Error).message };
+    }
+  },
+
+  // New function to send email
+  sendEmail: async (idPhien: string, maThamDu: string): Promise<{ success: boolean; message: string; error?: string }> => {
+    try {
+      const config = getApiConfig();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), config.TIMEOUT);
+
+      const response = await fetch(`${config.EMAIL_ENDPOINT}?idPhien=${idPhien}&MaThamDu=${maThamDu}`, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' }
+      });
+      clearTimeout(timeoutId);
+      if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
+      const data = await response.json();
+      return { success: data.success, message: data.message, error: data.error };
+    } catch (error) {
+      console.error('Error sending email:', error);
+      return { success: false, message: 'Email sending failed', error: (error as Error).message };
+    }
   }
 };
 

@@ -1,13 +1,11 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@repo/ui/button';
 import { Input } from '@repo/ui/input';
 import { UserRegistration } from '../types';
-import { storageUtils, apiUtils, generateId } from '../utils';
+import { storageUtils, apiUtils, generateId, SalesDate, Session } from '../utils';
 import { getApiConfig } from '../config';
-import { SalesDate } from '../utils';
-import { Session } from '../types'; // Added import for Session
 
 interface UserListProps {
   users: UserRegistration[];
@@ -24,6 +22,107 @@ export const UserList = ({ users, onUserUpdated, onStatusUpdate }: UserListProps
   const [sessionsMap, setSessionsMap] = useState<{ [salesDateId: string]: Session[] }>({});
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [isLoadingCaptchaForAll, setIsLoadingCaptchaForAll] = useState(false);
+  const [autoRunning, setAutoRunning] = useState<{ [key: string]: boolean }>({});
+  const hasFetchedCaptchaOnMount = useRef(false);
+
+  const isCapacityFull = (message: string | undefined): boolean => {
+    if (!message) return false;
+    const m = message.toLowerCase();
+    return m.includes('hết số lượng') || 
+           m.includes('this session is full') || 
+           m.includes('session is full') ||
+           m.includes('đầy chỗ') ||
+           m.includes('full') ||
+           m.includes('link đăng ký đang tạm đóng') ||
+           m.includes('đăng ký đang tạm đóng');
+  };
+
+  const handleAutoRegister = async (user: UserRegistration) => {
+    const captcha = captchaData[user.id]?.captchaInput || '';
+    if (!captcha) {
+      onStatusUpdate('Vui lòng nhập captcha trước khi chạy Auto đăng ký');
+      return;
+    }
+
+    console.log('Starting auto-register for user:', user.id, 'with captcha:', captcha);
+    setAutoRunning(prev => ({ ...prev, [user.id]: true }));
+
+    try {
+      // Determine start date index
+      const startIndex = Math.max(0, salesDates.findIndex(d => d.value === user.salesDate));
+      const orderedDates = salesDates.slice(startIndex);
+      
+      console.log('Will try dates starting from index:', startIndex, 'dates:', orderedDates.map(d => d.displayText));
+
+      for (const date of orderedDates) {
+        const sessions = sessionsMap[date.value] || [];
+        console.log(`Trying date: ${date.displayText}, sessions available:`, sessions.length);
+        
+        if (sessions.length === 0) {
+          onStatusUpdate(`Không có phiên cho ngày ${date.displayText}, thử ngày tiếp theo...`);
+          continue;
+        }
+
+        for (const session of sessions) {
+          onStatusUpdate(`Thử đăng ký: ${date.displayText} - ${session.displayText}...`);
+          console.log(`Attempting registration for session: ${session.displayText} (${session.value})`);
+
+          const attemptUser: UserRegistration = {
+            ...user,
+            salesDate: date.value,
+            session: session.value,
+            captcha
+          };
+
+          const res = await apiUtils.registerUser(attemptUser);
+          console.log('Registration response:', res);
+
+          const prefix = res.success ? '✅' : '❌';
+          const combinedMessage = `${prefix} ${res.message}`;
+
+          // Persist the latest attempt result
+          storageUtils.updateUser(user.id, {
+            registrationResult: combinedMessage,
+            registrationStatus: res.success ? 'success' : 'failed',
+            registrationDate: res.success ? new Date().toISOString() : undefined,
+            isRegistered: !!res.success,
+            salesDate: date.value,
+            session: session.value
+          });
+          onUserUpdated();
+
+          if (res.success) {
+            onStatusUpdate(`Đăng ký thành công: ${date.displayText} - ${session.displayText}`);
+            console.log('Registration successful, stopping auto-register');
+            return;
+          }
+
+          // Check if capacity is full
+          const isFull = isCapacityFull(res.message);
+          console.log('Capacity full check:', isFull, 'for message:', res.message);
+
+          // Continue only if capacity is full; otherwise stop (e.g., captcha sai)
+          if (!isFull) {
+            onStatusUpdate(`Đăng ký thất bại (không phải do đầy chỗ): ${res.message}`);
+            console.log('Stopping auto-register due to non-capacity error');
+            return;
+          }
+          // else: continue to next session
+          console.log('Session is full, trying next session...');
+        }
+        // All sessions for this date are full -> proceed to next date
+        console.log('All sessions for this date are full, trying next date...');
+      }
+
+      onStatusUpdate('Tất cả phiên trong các ngày đã chọn đều đầy chỗ. Không thể đăng ký.');
+      console.log('All dates and sessions tried, registration failed');
+    } catch (error) {
+      console.error('Auto-register error:', error);
+      onStatusUpdate(`Lỗi Auto đăng ký: ${(error as Error).message}`);
+    } finally {
+      setAutoRunning(prev => ({ ...prev, [user.id]: false }));
+    }
+  };
 
   useEffect(() => {
     // Fetch sales dates and sessions on component mount
@@ -67,9 +166,12 @@ export const UserList = ({ users, onUserUpdated, onStatusUpdate }: UserListProps
 
   // Auto-fetch captcha for all users on first render
   useEffect(() => {
+    // Only run once when users are first available
+    if (hasFetchedCaptchaOnMount.current) return;
+    if (!users || users.length === 0) return;
+    hasFetchedCaptchaOnMount.current = true;
+
     const fetchCaptchaForAllUsers = async () => {
-      if (users.length === 0) return;
-      
       setIsLoadingCaptchaForAll(true);
       onStatusUpdate('Đang tải captcha cho tất cả người dùng...');
       
@@ -171,20 +273,66 @@ export const UserList = ({ users, onUserUpdated, onStatusUpdate }: UserListProps
         ? `✅ ${registrationResponse.message}`
         : `❌ ${registrationResponse.message}`;
       
-      storageUtils.updateUser(user.id, {
+      const updateData: Partial<UserRegistration> = {
         registrationResult: resultMessage,
         isRegistered: registrationResponse.success,
         registrationDate: registrationResponse.success ? new Date().toISOString() : undefined,
         registrationStatus: registrationResponse.success ? 'success' : 'failed',
-        errorMessage: registrationResponse.success ? undefined : registrationResponse.message
-      });
+        errorMessage: registrationResponse.success ? undefined : registrationResponse.message,
+        maThamDu: registrationResponse.data?.maThamDu
+      };
+
+
+      // If registration successful, try to generate QR
+      if (registrationResponse.data?.maThamDu) {
+        onStatusUpdate('Đăng ký thành công! Đang tạo QR code...');
+        
+        try {
+          // Get session ID from the user's session value
+          const config = getApiConfig();
+          const idPhien = config.POP_MART.PARAMS.SESSION_MAPPING[user.session as keyof typeof config.POP_MART.PARAMS.SESSION_MAPPING] || '61';
+          
+          const qrResponse = await apiUtils.generateQR(idPhien, registrationResponse.data.maThamDu);
+          
+          if (qrResponse.success && qrResponse.qrImageUrl) {
+            updateData.maThamDu = registrationResponse.data.maThamDu;
+            updateData.qrImageUrl = qrResponse.qrImageUrl;
+            updateData.idPhien = idPhien;
+            onStatusUpdate('Đăng ký thành công! QR code đã được tạo.');
+            
+            // Automatically send email after successful QR generation
+            try {
+              onStatusUpdate('Đăng ký thành công! QR code đã được tạo. Đang gửi email...');
+              const emailResponse = await apiUtils.sendEmail(idPhien, registrationResponse.data.maThamDu);
+              
+              if (emailResponse.success) {
+                updateData.emailSent = true;
+                updateData.emailSentDate = new Date().toISOString();
+                onStatusUpdate('Đăng ký thành công! QR code và email đã được gửi.');
+              } else {
+                onStatusUpdate('Đăng ký thành công! QR code đã được tạo. Không thể gửi email.');
+              }
+            } catch (emailError) {
+              console.error('Email sending error:', emailError);
+              onStatusUpdate('Đăng ký thành công! QR code đã được tạo. Lỗi khi gửi email.');
+            }
+          } else {
+            onStatusUpdate('Đăng ký thành công! Không thể tạo QR code.');
+          }
+        } catch (qrError) {
+          console.error('QR generation error:', qrError);
+          onStatusUpdate('Đăng ký thành công! Lỗi khi tạo QR code.');
+        }
+      }
+
+      storageUtils.updateUser(user.id, updateData);
 
       // Clear captcha data
-      setCaptchaData(prev => {
-        const newData = { ...prev };
-        delete newData[user.id];
-        return newData;
-      });
+      // setCaptchaData(prev => {
+      //   const newData = { ...prev };
+      //   delete newData[user.id];
+      //   return newData;
+      // });
 
       onStatusUpdate(resultMessage);
       onUserUpdated();
@@ -460,20 +608,130 @@ export const UserList = ({ users, onUserUpdated, onStatusUpdate }: UserListProps
                     <span>📋</span>
                     <span>Copy cURL</span>
                   </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleAutoRegister(user)}
+                    disabled={!!autoRunning[user.id]}
+                    className="ml-1"
+                  >
+                    {autoRunning[user.id] ? (
+                      <>
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
+                        Đang auto...
+                      </>
+                    ) : (
+                      'Auto đăng ký'
+                    )}
+                  </Button>
                 </div>
               </div>
 
               {user.registrationResult && (
-                <div className={`text-sm p-2 rounded mt-2 ${
-                  user.registrationResult.includes('✅') || user.registrationResult.includes('thành công')
-                    ? 'bg-green-100 text-green-800 border border-green-200' 
-                    : 'bg-red-100 text-red-800 border border-red-200'
-                }`}>
-                  <div className="font-medium">Registration Result:</div>
-                  <div className="mt-1">{user.registrationResult}</div>
-                  {user.isRegistered && (
-                    <div className="text-xs text-green-600 mt-1">
-                      ✅ User has been successfully registered
+                <div className="mt-2 p-2 bg-gray-100 rounded text-sm">
+                  <div className="font-semibold">Kết quả đăng ký:</div>
+                  <div className="whitespace-pre-wrap">{user.registrationResult}</div>
+                  
+                  {/* Display QR code if available */}
+                  {user.qrImageUrl && (
+                    <div className="mt-2">
+                      <div className="font-semibold text-green-600">QR Code:</div>
+                      <div className="flex items-center space-x-2">
+                        <img 
+                          src={user.qrImageUrl} 
+                          alt="QR Code" 
+                          className="w-24 h-24 border rounded"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                        <div className="hidden text-red-500 text-xs">QR image failed to load</div>
+                        <div className="text-xs">
+                          <div><strong>Mã tham dự:</strong> {user.maThamDu}</div>
+                          <div><strong>Phiên:</strong> {user.idPhien}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Manual QR generation button for successful registrations without QR */}
+                  {user.isRegistered && !user.qrImageUrl && user.maThamDu && (
+                    <div className="mt-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            onStatusUpdate('Đang tạo QR code...');
+                            const config = getApiConfig();
+                            const idPhien = config.POP_MART.PARAMS.SESSION_MAPPING[user.session as keyof typeof config.POP_MART.PARAMS.SESSION_MAPPING] || '61';
+                            
+                            const qrResponse = await apiUtils.generateQR(idPhien, user.maThamDu!);
+                            
+                            if (qrResponse.success && qrResponse.qrImageUrl) {
+                              storageUtils.updateUser(user.id, {
+                                qrImageUrl: qrResponse.qrImageUrl,
+                                idPhien: idPhien
+                              });
+                              onStatusUpdate('QR code đã được tạo thành công!');
+                              onUserUpdated();
+                            } else {
+                              onStatusUpdate('Không thể tạo QR code: ' + (qrResponse.error || 'Unknown error'));
+                            }
+                          } catch (error) {
+                            onStatusUpdate('Lỗi khi tạo QR code: ' + (error as Error).message);
+                          }
+                        }}
+                        className="text-xs"
+                      >
+                        Tạo QR Code
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {/* Email sending button for successful registrations */}
+                  { user.maThamDu && (
+                    <div className="mt-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            onStatusUpdate('Đang gửi email...');
+                            const config = getApiConfig();
+                            const idPhien = config.POP_MART.PARAMS.SESSION_MAPPING[user.session as keyof typeof config.POP_MART.PARAMS.SESSION_MAPPING] || '61';
+                            
+                            const emailResponse = await apiUtils.sendEmail(idPhien, user.maThamDu!);
+                            
+                            if (emailResponse.success) {
+                              storageUtils.updateUser(user.id, {
+                                emailSent: true,
+                                emailSentDate: new Date().toISOString()
+                              });
+                              onStatusUpdate('Email đã được gửi thành công!');
+                              onUserUpdated();
+                            } else {
+                              onStatusUpdate('Không thể gửi email: ' + (emailResponse.error || 'Unknown error'));
+                            }
+                          } catch (error) {
+                            onStatusUpdate('Lỗi khi gửi email: ' + (error as Error).message);
+                          }
+                        }}
+                        className="text-xs ml-2"
+                      >
+                        Gửi Email
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {/* Email status display */}
+                  {user.emailSent && (
+                    <div className="mt-2 text-xs text-green-600">
+                      ✅ Email đã được gửi {user.emailSentDate && `(${new Date(user.emailSentDate).toLocaleString('vi-VN')})`}
                     </div>
                   )}
                 </div>

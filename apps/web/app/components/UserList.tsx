@@ -532,37 +532,83 @@ export const UserList = ({ users, onUserUpdated, onStatusUpdate }: UserListProps
                   )}
                 </div>
                 <div className="flex space-x-2">
-                  {/* Captcha Section - Show before register button */}
+                  {/* Captcha Section */}
                   {captchaData[user.id]?.imageUrl && (
-                    <div className="flex items-center space-x-2 mr-2">
-                      <div className="flex items-center space-x-1">
+                    <div className="flex items-center space-x-2">
+                      <div className="relative">
                         <img 
                           src={captchaData[user.id]?.imageUrl} 
                           alt="Captcha" 
-                          className="h-8 w-auto border rounded"
+                          className="w-20 h-12 border rounded"
                         />
-                        <button
+                        <Button
                           type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleRegister(user, e);
+                          variant="secondary"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              onStatusUpdate('Đang tải lại captcha...');
+                              const result = await apiUtils.getCaptcha();
+                              if (result.success && result.imageUrl) {
+                                setCaptchaData(prev => ({
+                                  ...prev,
+                                  [user.id]: {
+                                    imageUrl: result.imageUrl!,
+                                    sessionId: result.sessionId!,
+                                    captchaInput: ''
+                                  }
+                                }));
+                                onStatusUpdate('Đã tải lại captcha');
+                              } else {
+                                onStatusUpdate('Lỗi khi tải lại captcha: ' + (result.error || 'Unknown error'));
+                              }
+                            } catch (error) {
+                              onStatusUpdate('Lỗi khi tải lại captcha: ' + (error as Error).message);
+                            }
                           }}
-                          className="p-1 text-gray-500 hover:text-gray-700"
-                          title="Refresh captcha"
+                          className="absolute -top-1 -right-1 w-6 h-6 p-0 text-xs"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                          </svg>
-                        </button>
+                          ↻
+                        </Button>
                       </div>
-                      <input
-                        type="text"
-                        placeholder="Captcha"
-                        value={captchaData[user.id]?.captchaInput || ''}
-                        onChange={(e) => handleCaptchaInputChange(user.id, e.target.value)}
-                        className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500"
-                        maxLength={6}
-                      />
+                      <div className="flex flex-col space-y-1">
+                        <Input
+                          type="text"
+                          placeholder="Nhập captcha"
+                          value={captchaData[user.id]?.captchaInput || ''}
+                          onChange={(e) => handleCaptchaInputChange(user.id, e.target.value)}
+                          className="w-24 h-8 text-xs"
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              onStatusUpdate('Đang giải captcha bằng AI...');
+                              const result = await apiUtils.solveCaptcha(captchaData[user.id]?.imageUrl || '');
+                              if (result.success && result.captchaText) {
+                                setCaptchaData(prev => ({
+                                  ...prev,
+                                  [user.id]: {
+                                    ...prev[user.id]!,
+                                    captchaInput: result.captchaText!
+                                  }
+                                }));
+                                onStatusUpdate('AI đã giải captcha: ' + result.captchaText);
+                              } else {
+                                onStatusUpdate('Không thể giải captcha: ' + (result.error || 'Unknown error'));
+                              }
+                            } catch (error) {
+                              onStatusUpdate('Lỗi khi giải captcha: ' + (error as Error).message);
+                            }
+                          }}
+                          className="w-24 h-6 text-xs"
+                          disabled={!captchaData[user.id]?.imageUrl}
+                        >
+                          🤖 AI Giải
+                        </Button>
+                      </div>
                     </div>
                   )}
 

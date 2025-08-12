@@ -6,6 +6,7 @@ export const API_CONFIG = {
   SESSIONS_ENDPOINT: '/api/sessions', // NEW
   QR_GENERATION_ENDPOINT: '/api/qr-generation', // NEW
   EMAIL_ENDPOINT: '/api/send-email', // NEW
+  SOLVE_CAPTCHA_ENDPOINT: '/api/solve-captcha', // NEW
   
   // POP MART API Configuration
   POP_MART: {

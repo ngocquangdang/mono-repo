@@ -196,6 +196,29 @@ export const apiUtils = {
       console.error('Error sending email:', error);
       return { success: false, message: 'Email sending failed', error: (error as Error).message };
     }
+  },
+
+  // New function to solve captcha using AI
+  solveCaptcha: async (imageUrl: string, mimeType: string = 'image/png'): Promise<{ success: boolean; captchaText?: string; error?: string }> => {
+    try {
+      const config = getApiConfig();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), config.TIMEOUT);
+
+      const response = await fetch(config.SOLVE_CAPTCHA_ENDPOINT, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl, mimeType })
+      });
+      clearTimeout(timeoutId);
+      if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
+      const data = await response.json();
+      return { success: data.success, captchaText: data.captchaText, error: data.error };
+    } catch (error) {
+      console.error('Error solving captcha:', error);
+      return { success: false, error: (error as Error).message };
+    }
   }
 };
 

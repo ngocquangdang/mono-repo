@@ -30,8 +30,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json; charset=utf-8',
         'Accept': 'application/json',
         'Referer': 'https://popmartstt.com/popmart',
-        'Cookie': config.POP_MART.SESSION_COOKIE,
-        'User-Agent': config.DEFAULT_HEADERS['user-agent']
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36'
       },
       body: JSON.stringify(requestData),
       cache: 'no-store'

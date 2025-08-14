@@ -30,7 +30,6 @@ export async function POST(request: NextRequest) {
     
     console.log('Registration URL:', url);
     console.log('Registration data:', body);
-    console.log('Using session cookie:', config.POP_MART.SESSION_COOKIE);
 
     // Try fetch first
     let htmlResponse = '';
@@ -50,8 +49,7 @@ export async function POST(request: NextRequest) {
           'sec-fetch-dest': 'empty',
           'sec-fetch-mode': 'cors',
           'sec-fetch-site': 'same-origin',
-          'user-agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36',
-          'Cookie': config.POP_MART.SESSION_COOKIE
+          'user-agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36'
         },
         cache: 'no-store'
       });
@@ -65,7 +63,7 @@ export async function POST(request: NextRequest) {
       
       // Fallback to curl command
       try {
-        const curlCommand = `curl -s '${url}' -H 'Cookie: ${config.POP_MART.SESSION_COOKIE}'`;
+        const curlCommand = `curl -s '${url}'`;
         
         const { stdout, stderr } = await execAsync(curlCommand);
         htmlResponse = stdout;

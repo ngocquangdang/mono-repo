@@ -26,8 +26,7 @@ export async function GET(request: NextRequest) {
         'sec-fetch-mode': 'navigate',
         'sec-fetch-site': 'same-origin',
         'upgrade-insecure-requests': '1',
-        'user-agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36',
-        'Cookie': config.POP_MART.SESSION_COOKIE
+        'user-agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36'
       },
       cache: 'no-store'
     });

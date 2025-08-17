@@ -25,14 +25,11 @@ export interface UserRegistration {
   idPhien?: string; // Session ID for QR generation
   emailSent?: boolean; // Email sending status
   emailSentDate?: string; // Email sent timestamp
+  sessionId?: string; // Session ID for API calls
+  userAgent?: string; // Per-user user-agent string
 }
 
-export interface CaptchaResponse {
-  success: boolean;
-  imageUrl?: string;
-  sessionId?: string;
-  error?: string;
-}
+export interface CaptchaResponse { success: boolean; imageUrl?: string; sessionId?: string; setCookie?: string; cookie?: string; error?: string; }
 
 export interface RegistrationResponse {
   success: boolean;

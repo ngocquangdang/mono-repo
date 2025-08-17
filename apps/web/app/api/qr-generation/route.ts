@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getApiConfig } from '../../config';
+import { SessionManager } from '../../utils/sessionManager';
 
 export const runtime = 'nodejs';
 
@@ -16,6 +17,9 @@ export async function POST(request: NextRequest) {
 
     const config = getApiConfig();
     
+    // Add random delay to avoid detection
+    await SessionManager.randomDelay(500, 1500);
+    
     // Prepare the request data in the format expected by POP MART
     const requestData = {
       GiaTri: maThamDu,
@@ -26,12 +30,7 @@ export async function POST(request: NextRequest) {
     
     const response = await fetch(config.POP_MART.QR_GENERATION_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Accept': 'application/json',
-        'Referer': 'https://popmartstt.com/popmart',
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36'
-      },
+      headers: SessionManager.getJsonHeaders(),
       body: JSON.stringify(requestData),
       cache: 'no-store'
     });

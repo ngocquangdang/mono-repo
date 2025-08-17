@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getApiConfig } from '../../config';
+import { SessionManager } from '../../utils/sessionManager';
 
 export interface SalesDate {
   value: string;
@@ -11,23 +12,13 @@ export async function GET(request: NextRequest) {
   try {
     const config = getApiConfig();
     
+    // Add random delay to avoid detection
+    await SessionManager.randomDelay(500, 1500);
+    
     // Fetch the POP MART registration page
     const response = await fetch('https://popmartstt.com/popmart', {
       method: 'GET',
-      headers: {
-        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-        'accept-language': 'vi-VN,vi;q=0.9',
-        'priority': 'u=0, i',
-        'referer': 'https://popmartstt.com/?zarsrc=1303&utm_source=zalo&utm_medium=zalo&utm_campaign=zalo',
-        'sec-ch-ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
-        'sec-ch-ua-mobile': '?1',
-        'sec-ch-ua-platform': '"Android"',
-        'sec-fetch-dest': 'document',
-        'sec-fetch-mode': 'navigate',
-        'sec-fetch-site': 'same-origin',
-        'upgrade-insecure-requests': '1',
-        'user-agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36'
-      },
+      headers: SessionManager.getPageHeaders(),
       cache: 'no-store'
     });
 

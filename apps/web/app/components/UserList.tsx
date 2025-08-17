@@ -134,6 +134,7 @@ export const UserList = ({
             salesDate: date.value,
             session: session.value,
             captcha,
+            userAgent: navigator.userAgent
           };
 
           const res = await apiUtils.registerUser(attemptUser);
@@ -318,6 +319,7 @@ export const UserList = ({
     try {
       const captchaResponse = await apiUtils.getCaptcha();
       if (captchaResponse.success) {
+        // Persist per-user sessionId
         setCaptchaData((prev) => ({
           ...prev,
           [user.id]: {
@@ -360,6 +362,8 @@ export const UserList = ({
       const userWithCaptcha = {
         ...user,
         captcha: captchaData[user.id]?.captchaInput || "",
+        sessionId: captchaData[user.id]?.sessionId || "",
+        userAgent: navigator.userAgent
       };
 
       const registrationResponse = await apiUtils.registerUser(userWithCaptcha);

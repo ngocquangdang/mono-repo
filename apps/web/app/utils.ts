@@ -70,37 +70,45 @@ export const apiUtils = {
         headers: { 'Content-Type': 'application/json' },
       });
       clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
+      if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
       const data = await response.json();
-      return { success: data.success, imageUrl: data.imageUrl, sessionId: data.sessionId, error: data.error };
+
+      // Persist cookie returned by API if present
+      if (data.setCookie) {
+        try {
+          localStorage.setItem('popmart_cookie', data.setCookie);
+        } catch {}
+      }
+
+      return { success: data.success, imageUrl: data.imageUrl, sessionId: data.sessionId, error: data.error, ...('setCookie' in data ? { setCookie: data.setCookie } : {}) };
     } catch (error) {
-      console.error('Error fetching captcha:', error);
-      return { success: false, error: (error as Error).message };
+      console.error('Error getting captcha:', error);
+      return { success: false, error: (error as Error).message } as CaptchaResponse;
     }
   },
 
+  // Function to register a user
   registerUser: async (userData: UserRegistration): Promise<RegistrationResponse> => {
     try {
       const config = getApiConfig();
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), config.TIMEOUT);
 
+      const cookie = typeof window !== 'undefined' ? localStorage.getItem('popmart_cookie') || '' : '';
+      const userAgent = userData.userAgent || navigator.userAgent;
+
       const response = await fetch(config.REGISTER_ENDPOINT, {
         method: 'POST',
         signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData),
+        body: JSON.stringify({
+          ...userData,
+          cookie,
+          userAgent
+        })
       });
       clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
+      if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
       const data = await response.json();
       return { success: data.success, message: data.message, data: data.data };
     } catch (error) {

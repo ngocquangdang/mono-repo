@@ -189,7 +189,6 @@ export const RegistrationForm = ({ onUserSaved }: RegistrationFormProps) => {
             value={formData.salesDate}
             onChange={handleSalesDateChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
-            required
           >
             <option value="">-- Chọn ngày bán hàng --</option>
             {salesDates.map((date) => (
@@ -214,7 +213,6 @@ export const RegistrationForm = ({ onUserSaved }: RegistrationFormProps) => {
             value={formData.session}
             onChange={handleSessionChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
-            required
             disabled={!formData.salesDate || currentSessions.length === 0}
           >
             <option value="">-- Chọn phiên --</option>

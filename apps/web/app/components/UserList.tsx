@@ -64,35 +64,6 @@ export const UserList = ({
     setAutoRunning((prev) => ({ ...prev, [user.id]: true }));
 
     try {
-      // Step 1: Get captcha image
-      onStatusUpdate("Đang lấy captcha...");
-      const captchaResponse = await apiUtils.getCaptcha();
-      if (!captchaResponse.success || !captchaResponse.imageUrl) {
-        onStatusUpdate("Không thể lấy captcha. Vui lòng thử lại.");
-        return;
-      }
-
-      // Step 2: Solve captcha using AI
-      onStatusUpdate("Đang giải captcha bằng AI...");
-      const aiCaptchaResponse = await apiUtils.solveCaptcha(captchaResponse.imageUrl);
-      if (!aiCaptchaResponse.success || !aiCaptchaResponse.captchaText) {
-        onStatusUpdate("AI không thể giải captcha. Vui lòng thử lại.");
-        return;
-      }
-
-      const captcha = aiCaptchaResponse.captchaText;
-      onStatusUpdate(`AI đã giải captcha: ${captcha}. Bắt đầu auto đăng ký...`);
-
-      // Update captcha data in UI
-      setCaptchaData((prev) => ({
-        ...prev,
-        [user.id]: {
-          imageUrl: captchaResponse.imageUrl!,
-          sessionId: captchaResponse.sessionId!,
-          captchaInput: captcha,
-        },
-      }));
-
       // Step 3: Determine start date index
       const startIndex = Math.max(
         0,
@@ -122,9 +93,37 @@ export const UserList = ({
         }
 
         for (const session of sessions) {
+          // Step 1: Get new captcha for each attempt
+          onStatusUpdate(`Đang lấy captcha mới cho ${date.displayText} - ${session.displayText}...`);
+          const captchaResponse = await apiUtils.getCaptcha();
+          if (!captchaResponse.success || !captchaResponse.imageUrl) {
+            onStatusUpdate("Không thể lấy captcha. Thử phiên tiếp theo...");
+            continue;
+          }
+
+          // Step 2: Solve captcha using AI
+          onStatusUpdate("Đang giải captcha bằng AI...");
+          const aiCaptchaResponse = await apiUtils.solveCaptcha(captchaResponse.imageUrl);
+          if (!aiCaptchaResponse.success || !aiCaptchaResponse.captchaText) {
+            onStatusUpdate("AI không thể giải captcha. Thử phiên tiếp theo...");
+            continue;
+          }
+
+          const captcha = aiCaptchaResponse.captchaText;
           onStatusUpdate(
             `Thử đăng ký: ${date.displayText} - ${session.displayText} với captcha: ${captcha}...`
           );
+
+          // Update captcha data in UI
+          setCaptchaData((prev) => ({
+            ...prev,
+            [user.id]: {
+              imageUrl: captchaResponse.imageUrl!,
+              sessionId: captchaResponse.sessionId!,
+              captchaInput: captcha,
+            },
+          }));
+
           console.log(
             `Attempting registration for session: ${session.displayText} (${session.value})`
           );
@@ -173,23 +172,16 @@ export const UserList = ({
             res.message
           );
 
-          // Continue only if capacity is full; otherwise stop (e.g., captcha sai)
-          if (!isFull) {
-            onStatusUpdate(
-              `Đăng ký thất bại (không phải do đầy chỗ): ${res.message}`
-            );
-            console.log("Stopping auto-register due to non-capacity error");
-            return;
-          }
-          // else: continue to next session
-          console.log("Session is full, trying next session...");
+          // Continue to next session regardless of error type
+          // This allows retrying with new captcha even for non-capacity errors
+          console.log("Registration failed, trying next session with new captcha...");
         }
         // All sessions for this date are full -> proceed to next date
         console.log("All sessions for this date are full, trying next date...");
       }
 
       onStatusUpdate(
-        "Tất cả phiên trong các ngày đã chọn đều đầy chỗ. Không thể đăng ký."
+        "Đã thử tất cả phiên trong các ngày đã chọn. Không thể đăng ký."
       );
       console.log("All dates and sessions tried, registration failed");
     } catch (error) {

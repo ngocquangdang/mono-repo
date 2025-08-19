@@ -628,30 +628,69 @@ export const UserList = ({
         <div className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div className="text-sm text-gray-600">
             Tổng cộng: {users.length} người dùng
+            {(() => {
+              const defaultUsers = users.filter(user => user.id.startsWith('default-')).length;
+              const customUsers = users.length - defaultUsers;
+              return (
+                <span className="ml-2">
+                  ({defaultUsers} mặc định, {customUsers} tùy chỉnh)
+                </span>
+              );
+            })()}
           </div>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={handleRefreshAllCaptcha}
-            disabled={isLoadingCaptchaForAll}
-            className="flex items-center justify-center space-x-2 w-full sm:w-auto px-4 py-2"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleRefreshAllCaptcha}
+              disabled={isLoadingCaptchaForAll}
+              className="flex items-center justify-center space-x-2 w-full sm:w-auto px-4 py-2"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
-            <span>Tải lại tất cả Captcha</span>
-          </Button>
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              <span>Tải lại tất cả Captcha</span>
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                if (confirm('Bạn có chắc muốn đặt lại về danh sách người dùng mặc định? Tất cả dữ liệu tùy chỉnh sẽ bị mất.')) {
+                  storageUtils.resetToDefaultUsers();
+                  onUserUpdated();
+                  onStatusUpdate('Đã đặt lại về danh sách người dùng mặc định');
+                }
+              }}
+              className="flex items-center justify-center space-x-2 w-full sm:w-auto px-4 py-2"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              <span>Đặt lại mặc định</span>
+            </Button>
+          </div>
         </div>
       )}
 
@@ -668,7 +707,14 @@ export const UserList = ({
             <div key={user.id} className="border rounded-lg p-3 sm:p-4 bg-white shadow-sm">
               {/* User Info Section */}
               <div className="mb-3">
-                <h3 className="font-semibold text-base sm:text-lg mb-1">{user.fullName}</h3>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-semibold text-base sm:text-lg">{user.fullName}</h3>
+                  {user.id.startsWith('default-') && (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      Mặc định
+                    </span>
+                  )}
+                </div>
                 <div className="text-xs sm:text-sm text-gray-600 space-y-1">
                   <p>📧 {user.email}</p>
                   <p>📱 {user.phoneNumber}</p>
@@ -819,9 +865,11 @@ export const UserList = ({
                   variant="danger"
                   size="sm"
                   onClick={(e) => handleDelete(user.id, e)}
+                  disabled={user.id.startsWith('default-')}
                   className="flex-1 sm:flex-none px-3 py-2 text-sm"
+                  title={user.id.startsWith('default-') ? 'Không thể xóa người dùng mặc định' : 'Xóa người dùng'}
                 >
-                  Xóa
+                  {user.id.startsWith('default-') ? '🔒 Xóa' : 'Xóa'}
                 </Button>
                 {process.env.DISPLAY_COPY_CURL_BUTTON === "true" && (
                   <Button

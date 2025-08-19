@@ -1,6 +1,65 @@
 import { UserRegistration, CaptchaResponse, RegistrationResponse } from './types';
 import { getApiConfig } from './config';
 
+// Default users constant
+export const DEFAULT_USERS: Omit<UserRegistration, 'id' | 'createdAt' | 'updatedAt' | 'captcha' | 'isRegistered' | 'salesDate' | 'session'>[] = [
+  {
+    fullName: 'Đặng Văn Thay',
+    phoneNumber: '0902653215',
+    email: 'Dangvanthay.1995@gmail.com',
+    dateOfBirth: {
+      day: '13',
+      month: '09',
+      year: '1995'
+    },
+    idCard: '048095009075'
+  },
+  {
+    fullName: 'Đặng thị ngọc diễm',
+    dateOfBirth: {
+      day: '19',
+      month: '05',
+      year: '1996'
+    },
+    email: 'dangngocdiem960@gmail.com',
+    idCard: '066196016601',
+    phoneNumber: '0946045548'
+  },
+  {
+    fullName: 'Thái xuân linh',
+    email: 'linhlovedn2005@gmail.com',
+    phoneNumber: '0932474881',
+    idCard: '048090008495',
+    dateOfBirth: {
+      day: '22',
+      month: '05',
+      year: '1990'
+    }
+  },
+  {
+    fullName: 'Đặng Quốc Fai',
+    idCard: '048200007333',
+    email: 'quocfaidang@gmail.com',
+    dateOfBirth: {
+      day: '16',
+      month: '09',
+      year: '2000'
+    },
+    phoneNumber: '0702749479'
+  },
+  {
+    fullName: 'Mai đăng bảo',
+    phoneNumber: '0935122143',
+    dateOfBirth: {
+      day: '30',
+      month: '07',
+      year: '1995'
+    },
+    email: 'bisudu098@gmail.com',
+    idCard: '048095006892'
+  }
+];
+
 // Sales date interface (moved here for shared use)
 export interface SalesDate {
   value: string;
@@ -18,41 +77,158 @@ export interface Session {
 export const storageUtils = {
   getUsers: (): UserRegistration[] => {
     if (typeof window === 'undefined') return [];
-    const users = localStorage.getItem('popmart_registrations');
-    return users ? JSON.parse(users) : [];
+    
+    // Get users from localStorage
+    const storedUsers = localStorage.getItem('popmart_registrations');
+    const localUsers: UserRegistration[] = storedUsers ? JSON.parse(storedUsers) : [];
+    
+    // Convert default users to full UserRegistration objects
+    const defaultUsersWithIds: UserRegistration[] = DEFAULT_USERS.map((defaultUser, index) => ({
+      ...defaultUser,
+      id: `default-${index + 1}`,
+      salesDate: '',
+      session: '',
+      captcha: '',
+      isRegistered: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }));
+    
+    // Merge default users with local storage users
+    // If a default user already exists in local storage (by email), use the local version
+    const mergedUsers = [...defaultUsersWithIds];
+    
+    localUsers.forEach(localUser => {
+      const existingDefaultIndex = mergedUsers.findIndex(
+        defaultUser => defaultUser.email === localUser.email
+      );
+      
+      if (existingDefaultIndex !== -1) {
+        // Replace default user with local storage version
+        mergedUsers[existingDefaultIndex] = localUser;
+      } else {
+        // Add new local user
+        mergedUsers.push(localUser);
+      }
+    });
+    
+    return mergedUsers;
   },
   
   saveUser: (user: UserRegistration): void => {
     if (typeof window === 'undefined') return;
-    const users = storageUtils.getUsers();
-    users.push(user);
-    localStorage.setItem('popmart_registrations', JSON.stringify(users));
+    
+    // Get only local storage users (not merged with defaults)
+    const storedUsers = localStorage.getItem('popmart_registrations');
+    const localUsers: UserRegistration[] = storedUsers ? JSON.parse(storedUsers) : [];
+    
+    // Check if this user is updating a default user
+    const isDefaultUser = user.id.startsWith('default-');
+    
+    if (isDefaultUser) {
+      // For default users, we need to save them to localStorage with a new ID
+      const newUser = {
+        ...user,
+        id: generateId(), // Generate new ID for localStorage
+        updatedAt: new Date().toISOString()
+      };
+      localUsers.push(newUser);
+    } else {
+      // For new users, just add them
+      localUsers.push(user);
+    }
+    
+    localStorage.setItem('popmart_registrations', JSON.stringify(localUsers));
   },
   
   updateUser: (id: string, updates: Partial<UserRegistration>): void => {
     if (typeof window === 'undefined') return;
-    const users = storageUtils.getUsers();
-    const index = users.findIndex(user => user.id === id);
-    if (index !== -1) {
-      const updatedUser = { 
-        ...users[index], 
-        ...updates,
-        updatedAt: new Date().toISOString()
-      } as UserRegistration;
-      users[index] = updatedUser;
-      localStorage.setItem('popmart_registrations', JSON.stringify(users));
+    
+    // Get only local storage users (not merged with defaults)
+    const storedUsers = localStorage.getItem('popmart_registrations');
+    const localUsers: UserRegistration[] = storedUsers ? JSON.parse(storedUsers) : [];
+    
+    // Check if this is a default user being updated
+    const isDefaultUser = id.startsWith('default-');
+    
+    if (isDefaultUser) {
+      // For default users, we need to find them by email in localStorage
+      const defaultUser = DEFAULT_USERS.find((_, index) => `default-${index + 1}` === id);
+      if (defaultUser) {
+        const existingIndex = localUsers.findIndex(user => user.email === defaultUser.email);
+        
+        if (existingIndex !== -1) {
+          // Update existing local storage user
+          const updatedUser = { 
+            ...localUsers[existingIndex], 
+            ...updates,
+            updatedAt: new Date().toISOString()
+          } as UserRegistration;
+          localUsers[existingIndex] = updatedUser;
+        } else {
+          // Create new local storage user from default
+          const newUser = {
+            ...defaultUser,
+            ...updates,
+            id: generateId(),
+            salesDate: '',
+            session: '',
+            captcha: '',
+            isRegistered: false,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          } as UserRegistration;
+          localUsers.push(newUser);
+        }
+      }
+    } else {
+      // For regular users, update normally
+      const index = localUsers.findIndex(user => user.id === id);
+      if (index !== -1) {
+        const updatedUser = { 
+          ...localUsers[index], 
+          ...updates,
+          updatedAt: new Date().toISOString()
+        } as UserRegistration;
+        localUsers[index] = updatedUser;
+      }
     }
+    
+    localStorage.setItem('popmart_registrations', JSON.stringify(localUsers));
   },
   
   deleteUser: (id: string): void => {
     if (typeof window === 'undefined') return;
-    const users = storageUtils.getUsers();
-    const filteredUsers = users.filter(user => user.id !== id);
-    localStorage.setItem('popmart_registrations', JSON.stringify(filteredUsers));
+    
+    // Get only local storage users (not merged with defaults)
+    const storedUsers = localStorage.getItem('popmart_registrations');
+    const localUsers: UserRegistration[] = storedUsers ? JSON.parse(storedUsers) : [];
+    
+    // Check if this is a default user being deleted
+    const isDefaultUser = id.startsWith('default-');
+    
+    if (isDefaultUser) {
+      // For default users, we need to find them by email in localStorage
+      const defaultUser = DEFAULT_USERS.find((_, index) => `default-${index + 1}` === id);
+      if (defaultUser) {
+        const filteredUsers = localUsers.filter(user => user.email !== defaultUser.email);
+        localStorage.setItem('popmart_registrations', JSON.stringify(filteredUsers));
+      }
+    } else {
+      // For regular users, delete normally
+      const filteredUsers = localUsers.filter(user => user.id !== id);
+      localStorage.setItem('popmart_registrations', JSON.stringify(filteredUsers));
+    }
   },
   
   clearAllUsers: (): void => {
     if (typeof window === 'undefined') return;
+    localStorage.removeItem('popmart_registrations');
+  },
+  
+  resetToDefaultUsers: (): void => {
+    if (typeof window === 'undefined') return;
+    // Clear all local storage users to reset to defaults
     localStorage.removeItem('popmart_registrations');
   }
 };
